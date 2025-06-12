@@ -51,30 +51,56 @@ export const boardRules: Rule[] = [
     priority: 10,
   },
 
-  // R2: Eliminar un tablero
+  // R2: Eliminar un tablero - MEJORADO
   {
     id: "R2",
     condition: (facts: Facts) => {
-      return facts.intent === "eliminar_tablero" && (facts.entities?.tablero_id || facts.entities?.tablero_nombre)
+      console.log("Evaluando regla R2 (eliminar tablero):", facts)
+      return (
+        facts.intent === "eliminar_tablero" &&
+        (facts.entities?.tablero_nombre || facts.entities?.usar_tablero_actual || facts.boardId)
+      )
     },
     action: async (facts: Facts): Promise<ActionResult> => {
+      console.log("Ejecutando acción para eliminar tablero:", facts.entities)
+
       const boardsCollection = await getCollection("boards")
       let query = {}
+      let boardName = ""
 
-      if (facts.entities.tablero_id) {
-        query = { _id: convertToObjectId(facts.entities.tablero_id) }
-      } else if (facts.entities.tablero_nombre) {
-        query = { name: facts.entities.tablero_nombre }
+      // Determinar qué tablero eliminar
+      if (facts.entities?.usar_tablero_actual && facts.boardId) {
+        // Eliminar el tablero actual
+        query = { _id: convertToObjectId(facts.boardId) }
+        console.log("Eliminando tablero actual con ID:", facts.boardId)
+      } else if (facts.entities?.tablero_nombre) {
+        // Eliminar tablero por nombre - insensible a mayúsculas/minúsculas
+        query = { name: { $regex: new RegExp(`^${facts.entities.tablero_nombre}$`, "i") } }
+        console.log("Eliminando tablero por nombre:", facts.entities.tablero_nombre)
+      } else if (facts.boardId) {
+        // Si no se especifica nombre pero hay boardId, usar el actual
+        query = { _id: convertToObjectId(facts.boardId) }
+        console.log("Eliminando tablero actual (sin nombre especificado):", facts.boardId)
+      } else {
+        return {
+          success: false,
+          message: "No se especificó qué tablero eliminar.",
+          actionTaken: false,
+        }
       }
 
       const board = await boardsCollection.findOne(query)
       if (!board) {
         return {
           success: false,
-          message: "No se encontró el tablero especificado.",
+          message: facts.entities?.tablero_nombre
+            ? `No se encontró el tablero "${facts.entities.tablero_nombre}".`
+            : "No se encontró el tablero especificado.",
           actionTaken: false,
         }
       }
+
+      boardName = board.name
 
       // Eliminar el tablero
       const deleteResult = await boardsCollection.deleteOne({ _id: board._id })
@@ -90,7 +116,7 @@ export const boardRules: Rule[] = [
 
         return {
           success: true,
-          message: `Tablero "${board.name}" eliminado con éxito junto con todas sus columnas y tareas.`,
+          message: `Tablero "${boardName}" eliminado con éxito junto con todas sus columnas y tareas.`,
           actionTaken: true,
         }
       }
@@ -104,38 +130,80 @@ export const boardRules: Rule[] = [
     priority: 10,
   },
 
-  // R3: Modificar título de un tablero
+  // R3: Modificar título de un tablero - MEJORADO
   {
     id: "R3",
     condition: (facts: Facts) => {
+      console.log("Evaluando regla R3 (modificar tablero):", facts)
       return (
         facts.intent === "modificar_tablero" &&
         facts.entities?.tablero_nombre_nuevo &&
-        (facts.boardId || facts.entities?.tablero_nombre_actual)
+        (facts.entities?.tablero_nombre_actual || facts.entities?.usar_tablero_actual || facts.boardId)
       )
     },
     action: async (facts: Facts): Promise<ActionResult> => {
+      console.log("Ejecutando acción para modificar tablero:", facts.entities)
+
       const boardsCollection = await getCollection("boards")
       let query = {}
+      let nombreAnterior = ""
 
-      if (facts.boardId) {
+      // Determinar qué tablero modificar
+      if (facts.entities?.usar_tablero_actual && facts.boardId) {
+        // Modificar el tablero actual
         query = { _id: convertToObjectId(facts.boardId) }
-      } else if (facts.entities.tablero_nombre_actual) {
-        query = { name: facts.entities.tablero_nombre_actual }
+        console.log("Modificando tablero actual con ID:", facts.boardId)
+      } else if (facts.entities?.tablero_nombre_actual) {
+        // Modificar tablero por nombre actual - insensible a mayúsculas/minúsculas
+        query = { name: { $regex: new RegExp(`^${facts.entities.tablero_nombre_actual}$`, "i") } }
+        console.log("Modificando tablero por nombre actual:", facts.entities.tablero_nombre_actual)
+      } else if (facts.boardId) {
+        // Si no se especifica nombre actual pero hay boardId, usar el actual
+        query = { _id: convertToObjectId(facts.boardId) }
+        console.log("Modificando tablero actual (sin nombre actual especificado):", facts.boardId)
+      } else {
+        return {
+          success: false,
+          message: "No se especificó qué tablero modificar.",
+          actionTaken: false,
+        }
       }
 
-      const updateResult = await boardsCollection.updateOne(query, {
-        $set: {
-          name: facts.entities.tablero_nombre_nuevo,
-          updatedAt: new Date(),
+      // Primero obtener el tablero para conocer su nombre actual
+      const board = await boardsCollection.findOne(query)
+      if (!board) {
+        return {
+          success: false,
+          message: facts.entities?.tablero_nombre_actual
+            ? `No se encontró el tablero "${facts.entities.tablero_nombre_actual}".`
+            : "No se encontró el tablero especificado.",
+          actionTaken: false,
+        }
+      }
+
+      nombreAnterior = board.name
+
+      // Actualizar el nombre del tablero
+      const updateResult = await boardsCollection.updateOne(
+        { _id: board._id },
+        {
+          $set: {
+            name: facts.entities.tablero_nombre_nuevo,
+            updatedAt: new Date(),
+          },
         },
-      })
+      )
 
       if (updateResult.matchedCount === 1) {
         return {
           success: true,
-          message: `Nombre del tablero actualizado a "${facts.entities.tablero_nombre_nuevo}".`,
+          message: `Nombre del tablero actualizado de "${nombreAnterior}" a "${facts.entities.tablero_nombre_nuevo}".`,
           actionTaken: true,
+          data: {
+            boardId: board._id.toString(),
+            oldName: nombreAnterior,
+            newName: facts.entities.tablero_nombre_nuevo,
+          },
         }
       }
 

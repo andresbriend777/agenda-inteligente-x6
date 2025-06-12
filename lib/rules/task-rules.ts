@@ -11,7 +11,14 @@ export const taskRules: Rule[] = [
       console.log("Evaluando regla R7 (crear tarea):", facts)
       return (
         (facts.intent === "crear_tarea" ||
-          (facts.message.toLowerCase().includes("crea") && facts.message.toLowerCase().includes("tarea"))) &&
+          (facts.message.toLowerCase().includes("tarea") &&
+            (facts.message.toLowerCase().includes("crear") ||
+              facts.message.toLowerCase().includes("crea") ||
+              facts.message.toLowerCase().includes("nueva") ||
+              facts.message.toLowerCase().includes("añadir") ||
+              facts.message.toLowerCase().includes("añade") ||
+              facts.message.toLowerCase().includes("agregar") ||
+              facts.message.toLowerCase().includes("agrega")))) &&
         facts.entities?.tarea_titulo &&
         facts.boardId
       )
@@ -52,6 +59,26 @@ export const taskRules: Rule[] = [
 
       if (!column) {
         console.log("No se encontró la columna:", columnQuery)
+
+        // Si no se encuentra la columna específica, intentar obtener la primera columna del tablero
+        if (facts.entities.columna_nombre) {
+          console.log("Intentando obtener la primera columna del tablero")
+          const primerColumna = await columnsCollection
+            .find({ boardId: convertToObjectId(facts.boardId) })
+            .sort({ order: 1 })
+            .limit(1)
+            .toArray()
+
+          if (primerColumna.length > 0) {
+            console.log("Usando primera columna disponible:", primerColumna[0].name)
+            return {
+              success: false,
+              message: `No se encontró la columna "${facts.entities.columna_nombre}". ¿Quieres crear la tarea en la columna "${primerColumna[0].name}"?`,
+              actionTaken: false,
+            }
+          }
+        }
+
         return {
           success: false,
           message: `No se encontró la columna ${
@@ -89,6 +116,16 @@ export const taskRules: Rule[] = [
         if (facts.entities.tarea_fecha) {
           const fechaFormateada = DateParser.formatDate(new Date(facts.entities.tarea_fecha))
           message += ` Fecha de vencimiento: ${fechaFormateada}.`
+        }
+
+        // Añadir información sobre la prioridad si se estableció
+        if (facts.entities.tarea_prioridad) {
+          message += ` Prioridad: ${facts.entities.tarea_prioridad}.`
+        }
+
+        // Añadir información sobre los miembros si se establecieron
+        if (facts.entities.tarea_miembros && facts.entities.tarea_miembros.length > 0) {
+          message += ` Miembros: ${facts.entities.tarea_miembros.join(", ")}.`
         }
 
         return {
@@ -131,6 +168,24 @@ export const taskRules: Rule[] = [
       })
 
       if (!task) {
+        // Si no se encuentra la tarea exacta, buscar tareas que contengan el texto
+        const similarTasks = await tasksCollection
+          .find({
+            title: { $regex: new RegExp(facts.entities.tarea_titulo, "i") },
+            boardId: convertToObjectId(facts.boardId),
+          })
+          .limit(3)
+          .toArray()
+
+        if (similarTasks.length > 0) {
+          const taskNames = similarTasks.map((t) => `"${t.title}"`).join(", ")
+          return {
+            success: false,
+            message: `No se encontró la tarea exacta "${facts.entities.tarea_titulo}". ¿Te refieres a alguna de estas tareas? ${taskNames}`,
+            actionTaken: false,
+          }
+        }
+
         return {
           success: false,
           message: `No se encontró la tarea "${facts.entities.tarea_titulo}" en este tablero.`,
@@ -180,6 +235,38 @@ export const taskRules: Rule[] = [
 
       const tasksCollection = await getCollection("tasks")
 
+      // Buscar la tarea por título en el tablero actual - insensible a mayúsculas/minúsculas
+      const task = await tasksCollection.findOne({
+        title: { $regex: new RegExp(`^${facts.entities.tarea_titulo_actual}$`, "i") },
+        boardId: convertToObjectId(facts.boardId),
+      })
+
+      if (!task) {
+        // Si no se encuentra la tarea exacta, buscar tareas que contengan el texto
+        const similarTasks = await tasksCollection
+          .find({
+            title: { $regex: new RegExp(facts.entities.tarea_titulo_actual, "i") },
+            boardId: convertToObjectId(facts.boardId),
+          })
+          .limit(3)
+          .toArray()
+
+        if (similarTasks.length > 0) {
+          const taskNames = similarTasks.map((t) => `"${t.title}"`).join(", ")
+          return {
+            success: false,
+            message: `No se encontró la tarea exacta "${facts.entities.tarea_titulo_actual}". ¿Te refieres a alguna de estas tareas? ${taskNames}`,
+            actionTaken: false,
+          }
+        }
+
+        return {
+          success: false,
+          message: `No se encontró la tarea "${facts.entities.tarea_titulo_actual}" en este tablero.`,
+          actionTaken: false,
+        }
+      }
+
       const updateData: UpdateData = { updatedAt: new Date() }
 
       if (facts.entities.tarea_titulo_nuevo) {
@@ -190,13 +277,7 @@ export const taskRules: Rule[] = [
         updateData.description = facts.entities.tarea_descripcion
       }
 
-      const updateResult = await tasksCollection.updateOne(
-        {
-          title: { $regex: new RegExp(`^${facts.entities.tarea_titulo_actual}$`, "i") },
-          boardId: convertToObjectId(facts.boardId),
-        },
-        { $set: updateData },
-      )
+      const updateResult = await tasksCollection.updateOne({ _id: task._id }, { $set: updateData })
 
       if (updateResult.matchedCount === 1) {
         let message = "Tarea actualizada con éxito."
@@ -244,6 +325,38 @@ export const taskRules: Rule[] = [
 
       const tasksCollection = await getCollection("tasks")
 
+      // Buscar la tarea por título en el tablero actual - insensible a mayúsculas/minúsculas
+      const task = await tasksCollection.findOne({
+        title: { $regex: new RegExp(`^${facts.entities.tarea_titulo}$`, "i") },
+        boardId: convertToObjectId(facts.boardId),
+      })
+
+      if (!task) {
+        // Si no se encuentra la tarea exacta, buscar tareas que contengan el texto
+        const similarTasks = await tasksCollection
+          .find({
+            title: { $regex: new RegExp(facts.entities.tarea_titulo, "i") },
+            boardId: convertToObjectId(facts.boardId),
+          })
+          .limit(3)
+          .toArray()
+
+        if (similarTasks.length > 0) {
+          const taskNames = similarTasks.map((t) => `"${t.title}"`).join(", ")
+          return {
+            success: false,
+            message: `No se encontró la tarea exacta "${facts.entities.tarea_titulo}". ¿Te refieres a alguna de estas tareas? ${taskNames}`,
+            actionTaken: false,
+          }
+        }
+
+        return {
+          success: false,
+          message: `No se encontró la tarea "${facts.entities.tarea_titulo}" en este tablero.`,
+          actionTaken: false,
+        }
+      }
+
       // Normalizar la prioridad
       let priority = facts.entities.tarea_prioridad.toLowerCase()
       if (priority === "alta" || priority === "high") {
@@ -257,10 +370,7 @@ export const taskRules: Rule[] = [
       }
 
       const updateResult = await tasksCollection.updateOne(
-        {
-          title: { $regex: new RegExp(`^${facts.entities.tarea_titulo}$`, "i") },
-          boardId: convertToObjectId(facts.boardId),
-        },
+        { _id: task._id },
         {
           $set: {
             priority,
@@ -272,7 +382,7 @@ export const taskRules: Rule[] = [
       if (updateResult.matchedCount === 1) {
         return {
           success: true,
-          message: `Prioridad de la tarea "${facts.entities.tarea_titulo}" actualizada a "${priority}".`,
+          message: `Prioridad de la tarea "${task.title}" actualizada a "${priority}".`,
           actionTaken: true,
         }
       }
@@ -317,6 +427,25 @@ export const taskRules: Rule[] = [
 
       if (!task) {
         console.log("No se encontró la tarea")
+
+        // Si no se encuentra la tarea exacta, buscar tareas que contengan el texto
+        const similarTasks = await tasksCollection
+          .find({
+            title: { $regex: new RegExp(facts.entities.tarea_titulo, "i") },
+            boardId: convertToObjectId(facts.boardId),
+          })
+          .limit(3)
+          .toArray()
+
+        if (similarTasks.length > 0) {
+          const taskNames = similarTasks.map((t) => `"${t.title}"`).join(", ")
+          return {
+            success: false,
+            message: `No se encontró la tarea exacta "${facts.entities.tarea_titulo}". ¿Te refieres a alguna de estas tareas? ${taskNames}`,
+            actionTaken: false,
+          }
+        }
+
         return {
           success: false,
           message: `No se encontró la tarea "${facts.entities.tarea_titulo}" en este tablero.`,
@@ -393,6 +522,25 @@ export const taskRules: Rule[] = [
 
       if (!task) {
         console.log("No se encontró la tarea")
+
+        // Si no se encuentra la tarea exacta, buscar tareas que contengan el texto
+        const similarTasks = await tasksCollection
+          .find({
+            title: { $regex: new RegExp(facts.entities.tarea_titulo, "i") },
+            boardId: convertToObjectId(facts.boardId),
+          })
+          .limit(3)
+          .toArray()
+
+        if (similarTasks.length > 0) {
+          const taskNames = similarTasks.map((t) => `"${t.title}"`).join(", ")
+          return {
+            success: false,
+            message: `No se encontró la tarea exacta "${facts.entities.tarea_titulo}". ¿Te refieres a alguna de estas tareas? ${taskNames}`,
+            actionTaken: false,
+          }
+        }
+
         return {
           success: false,
           message: `No se encontró la tarea "${facts.entities.tarea_titulo}" en este tablero.`,
@@ -433,10 +581,11 @@ export const taskRules: Rule[] = [
       if (updateResult.matchedCount === 1) {
         const accionTexto =
           accion === "agregar" || accion === "asignar" || accion === "añadir" ? "asignados a" : "removidos de"
+        const miembrosTexto = facts.entities.tarea_miembros.join(", ")
 
         return {
           success: true,
-          message: `Miembros ${accionTexto} la tarea "${task.title}" correctamente.`,
+          message: `Miembros ${miembrosTexto} ${accionTexto} la tarea "${task.title}" correctamente.`,
           actionTaken: true,
         }
       }
@@ -480,6 +629,24 @@ export const taskRules: Rule[] = [
       })
 
       if (!task) {
+        // Si no se encuentra la tarea exacta, buscar tareas que contengan el texto
+        const similarTasks = await tasksCollection
+          .find({
+            title: { $regex: new RegExp(facts.entities.tarea_titulo, "i") },
+            boardId: convertToObjectId(facts.boardId),
+          })
+          .limit(3)
+          .toArray()
+
+        if (similarTasks.length > 0) {
+          const taskNames = similarTasks.map((t) => `"${t.title}"`).join(", ")
+          return {
+            success: false,
+            message: `No se encontró la tarea exacta "${facts.entities.tarea_titulo}". ¿Te refieres a alguna de estas tareas? ${taskNames}`,
+            actionTaken: false,
+          }
+        }
+
         return {
           success: false,
           message: `No se encontró la tarea "${facts.entities.tarea_titulo}" en este tablero.`,
@@ -494,12 +661,37 @@ export const taskRules: Rule[] = [
       })
 
       if (!destColumn) {
+        // Si no se encuentra la columna exacta, buscar columnas que contengan el texto
+        const similarColumns = await columnsCollection
+          .find({
+            name: { $regex: new RegExp(facts.entities.columna_destino, "i") },
+            boardId: convertToObjectId(facts.boardId),
+          })
+          .limit(3)
+          .toArray()
+
+        if (similarColumns.length > 0) {
+          const columnNames = similarColumns.map((c) => `"${c.name}"`).join(", ")
+          return {
+            success: false,
+            message: `No se encontró la columna exacta "${facts.entities.columna_destino}". ¿Te refieres a alguna de estas columnas? ${columnNames}`,
+            actionTaken: false,
+          }
+        }
+
         return {
           success: false,
           message: `No se encontró la columna "${facts.entities.columna_destino}" en este tablero.`,
           actionTaken: false,
         }
       }
+
+      // Obtener la columna actual para el mensaje
+      const currentColumn = await columnsCollection.findOne({
+        _id: task.columnId,
+      })
+
+      const currentColumnName = currentColumn ? currentColumn.name : "desconocida"
 
       // Mover la tarea
       const updateResult = await tasksCollection.updateOne(
@@ -515,7 +707,7 @@ export const taskRules: Rule[] = [
       if (updateResult.matchedCount === 1) {
         return {
           success: true,
-          message: `Tarea "${task.title}" movida a la columna "${destColumn.name}".`,
+          message: `Tarea "${task.title}" movida de la columna "${currentColumnName}" a la columna "${destColumn.name}".`,
           actionTaken: true,
         }
       }
@@ -554,6 +746,24 @@ export const taskRules: Rule[] = [
       })
 
       if (!task) {
+        // Si no se encuentra la tarea exacta, buscar tareas que contengan el texto
+        const similarTasks = await tasksCollection
+          .find({
+            title: { $regex: new RegExp(facts.entities.tarea_titulo, "i") },
+            boardId: convertToObjectId(facts.boardId),
+          })
+          .limit(3)
+          .toArray()
+
+        if (similarTasks.length > 0) {
+          const taskNames = similarTasks.map((t) => `"${t.title}"`).join(", ")
+          return {
+            success: false,
+            message: `No se encontró la tarea exacta "${facts.entities.tarea_titulo}". ¿Te refieres a alguna de estas tareas? ${taskNames}`,
+            actionTaken: false,
+          }
+        }
+
         return {
           success: false,
           message: `No se encontró la tarea "${facts.entities.tarea_titulo}" en este tablero.`,
@@ -568,12 +778,57 @@ export const taskRules: Rule[] = [
       })
 
       if (!completedColumn) {
+        // Si no se encuentra la columna "Completadas", buscar la última columna del tablero
+        console.log("No se encontró la columna 'Completadas', buscando la última columna")
+        const ultimaColumna = await columnsCollection
+          .find({ boardId: convertToObjectId(facts.boardId) })
+          .sort({ order: -1 })
+          .limit(1)
+          .toArray()
+
+        if (ultimaColumna.length > 0) {
+          console.log("Usando última columna disponible:", ultimaColumna[0].name)
+
+          // Obtener la columna actual para el mensaje
+          const currentColumn = await columnsCollection.findOne({
+            _id: task.columnId,
+          })
+
+          const currentColumnName = currentColumn ? currentColumn.name : "desconocida"
+
+          // Mover la tarea a la última columna
+          const updateResult = await tasksCollection.updateOne(
+            { _id: task._id },
+            {
+              $set: {
+                columnId: ultimaColumna[0]._id,
+                updatedAt: new Date(),
+              },
+            },
+          )
+
+          if (updateResult.matchedCount === 1) {
+            return {
+              success: true,
+              message: `Tarea "${task.title}" marcada como completada y movida de la columna "${currentColumnName}" a la columna "${ultimaColumna[0].name}".`,
+              actionTaken: true,
+            }
+          }
+        }
+
         return {
           success: false,
           message: 'No se encontró la columna "Completadas" en este tablero.',
           actionTaken: false,
         }
       }
+
+      // Obtener la columna actual para el mensaje
+      const currentColumn = await columnsCollection.findOne({
+        _id: task.columnId,
+      })
+
+      const currentColumnName = currentColumn ? currentColumn.name : "desconocida"
 
       // Mover la tarea a "Completadas"
       const updateResult = await tasksCollection.updateOne(
@@ -589,7 +844,7 @@ export const taskRules: Rule[] = [
       if (updateResult.matchedCount === 1) {
         return {
           success: true,
-          message: `Tarea "${task.title}" marcada como completada y movida a la columna "Completadas".`,
+          message: `Tarea "${task.title}" marcada como completada y movida de la columna "${currentColumnName}" a la columna "Completadas".`,
           actionTaken: true,
         }
       }

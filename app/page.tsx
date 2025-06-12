@@ -51,6 +51,20 @@ export default function Home() {
       const response = await fetch("/api/boards")
       const data = await response.json()
       setBoards(data)
+
+      // Si el tablero activo fue eliminado, volver a la página principal
+      if (activeBoard) {
+        const boardStillExists = data.find((board: Board) => board._id === activeBoard._id)
+        if (!boardStillExists) {
+          setActiveBoard(null)
+        } else {
+          // Si el tablero existe pero cambió de nombre, actualizar la referencia
+          const updatedBoard = data.find((board: Board) => board._id === activeBoard._id)
+          if (updatedBoard && updatedBoard.name !== activeBoard.name) {
+            setActiveBoard(updatedBoard)
+          }
+        }
+      }
     } catch (error) {
       console.error("Error refreshing boards:", error)
     }

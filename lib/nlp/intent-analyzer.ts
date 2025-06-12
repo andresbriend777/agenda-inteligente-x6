@@ -30,16 +30,51 @@ export class IntentAnalyzer {
           facts.entities.tablero_nombre = "Nuevo Tablero"
         }
       }
-    } else if (message.match(/eliminar\s+(?:el\s+)?tablero/i)) {
+    }
+    // Mejorar detección para eliminar tablero
+    else if (
+      message.match(/eliminar?\s+(?:el\s+)?tablero/i) ||
+      message.match(/borrar?\s+(?:el\s+)?tablero/i) ||
+      message.match(/quitar?\s+(?:el\s+)?tablero/i) ||
+      message.match(/elimina\s+tablero/i) ||
+      message.match(/borra\s+tablero/i)
+    ) {
       facts.intent = "eliminar_tablero"
       EntityExtractor.extractTableroEntities(facts)
-    } else if (
-      message.match(/cambiar\s+(?:el\s+)?nombre\s+(?:del\s+)?tablero/i) ||
-      message.match(/renombrar\s+(?:el\s+)?tablero/i) ||
-      message.match(/modificar\s+(?:el\s+)?tablero/i)
+
+      // Si no se especifica un tablero y hay uno activo, usar el actual
+      if (!facts.entities?.tablero_nombre && facts.boardId) {
+        facts.entities.usar_tablero_actual = true
+      }
+    }
+    // Mejorar detección para modificar tablero - AMPLIADO Y CORREGIDO
+    else if (
+      message.match(/cambiar?\s+(?:el\s+)?nombre\s+(?:del\s+)?tablero/i) ||
+      message.match(/renombrar?\s+(?:el\s+)?tablero/i) ||
+      message.match(/modificar?\s+(?:el\s+)?(?:nombre\s+del\s+)?tablero/i) ||
+      message.match(/cambiar?\s+(?:el\s+)?tablero/i) ||
+      message.match(/renombra\s+tablero/i) ||
+      message.match(/cambia\s+(?:el\s+)?tablero/i) ||
+      message.match(/modifica\s+(?:el\s+)?(?:nombre\s+(?:de\s+)?)?tablero/i) ||
+      (message.includes("cambiar") && message.includes("tablero")) ||
+      (message.includes("cambia") && message.includes("tablero")) ||
+      (message.includes("renombrar") && message.includes("tablero")) ||
+      (message.includes("renombra") && message.includes("tablero")) ||
+      (message.includes("modificar") && message.includes("tablero")) ||
+      (message.includes("modifica") && message.includes("tablero")) ||
+      // Patrones específicos para "X por Y"
+      message.match(/tablero\s+\w+\s+por\s+\w+/i) ||
+      // Patrones específicos para "X a Y"
+      message.match(/tablero\s+\w+\s+a\s+\w+/i)
     ) {
       facts.intent = "modificar_tablero"
+      console.log("Intención detectada: modificar_tablero")
       EntityExtractor.extractTableroEntities(facts)
+
+      // Si no se especifica un tablero y hay uno activo, usar el actual
+      if (!facts.entities?.tablero_nombre_actual && facts.boardId) {
+        facts.entities.usar_tablero_actual = true
+      }
     }
     // Detección más robusta para crear columnas
     else if (
@@ -91,23 +126,49 @@ export class IntentAnalyzer {
           console.log("Usando nombre por defecto: Nueva Columna")
         }
       }
-    } else if (message.match(/eliminar\s+(?:la\s+)?columna/i)) {
+    }
+    // Mejorar detección para eliminar columna
+    else if (
+      message.match(/eliminar?\s+(?:la\s+)?columna/i) ||
+      message.match(/borrar?\s+(?:la\s+)?columna/i) ||
+      message.match(/quitar?\s+(?:la\s+)?columna/i) ||
+      message.match(/elimina\s+columna/i) ||
+      message.match(/borra\s+columna/i)
+    ) {
       facts.intent = "eliminar_columna"
       EntityExtractor.extractColumnaEntities(facts)
-    } else if (
-      message.match(/cambiar\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna/i) ||
-      message.match(/renombrar\s+(?:la\s+)?columna/i) ||
-      message.match(/modificar\s+(?:la\s+)?columna/i)
+    }
+    // Mejorar detección para modificar columna
+    else if (
+      message.match(/cambiar?\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna/i) ||
+      message.match(/renombrar?\s+(?:la\s+)?columna/i) ||
+      message.match(/modificar?\s+(?:la\s+)?columna/i) ||
+      message.match(/cambiar?\s+(?:la\s+)?columna/i) ||
+      message.match(/renombra\s+columna/i) ||
+      message.match(/cambia\s+(?:la\s+)?columna/i) ||
+      message.match(/modifica\s+(?:la\s+)?columna/i) ||
+      // Patrones específicos para "X por Y"
+      message.match(/columna\s+\w+\s+por\s+\w+/i) ||
+      // Patrones específicos para "X a Y"
+      message.match(/columna\s+\w+\s+a\s+\w+/i)
     ) {
       facts.intent = "modificar_columna"
       EntityExtractor.extractColumnaEntities(facts)
     }
-    // Detección mejorada para crear tareas
+    // Detección mejorada para crear tareas - MEJORADO
     else if (
       message.match(/crea(?:r)?\s+(?:una\s+)?tarea/i) ||
       message.match(/nueva\s+tarea/i) ||
+      message.match(/añadir?\s+(?:una\s+)?tarea/i) ||
+      message.match(/agregar?\s+(?:una\s+)?tarea/i) ||
       (message.includes("tarea") &&
-        (message.includes("crear") || message.includes("crea") || message.includes("nueva")))
+        (message.includes("crear") ||
+          message.includes("crea") ||
+          message.includes("nueva") ||
+          message.includes("añadir") ||
+          message.includes("añade") ||
+          message.includes("agregar") ||
+          message.includes("agrega")))
     ) {
       facts.intent = "crear_tarea"
       console.log("Intención detectada: crear_tarea")
@@ -119,10 +180,14 @@ export class IntentAnalyzer {
 
         // Buscar patrones comunes para títulos de tareas
         const patronesTitulo = [
-          /tarea\s+([^\s,.]+)/i,
-          /crear\s+tarea\s+([^\s,.]+)/i,
-          /crea\s+tarea\s+([^\s,.]+)/i,
-          /nueva\s+tarea\s+([^\s,.]+)/i,
+          /tarea\s+([^\s",.]+)/i,
+          /crear\s+tarea\s+([^\s",.]+)/i,
+          /crea\s+tarea\s+([^\s",.]+)/i,
+          /nueva\s+tarea\s+([^\s",.]+)/i,
+          /añadir\s+tarea\s+([^\s",.]+)/i,
+          /añade\s+tarea\s+([^\s",.]+)/i,
+          /agregar\s+tarea\s+([^\s",.]+)/i,
+          /agrega\s+tarea\s+([^\s",.]+)/i,
         ]
 
         for (const patron of patronesTitulo) {
@@ -140,23 +205,61 @@ export class IntentAnalyzer {
           console.log("Usando título por defecto: Nueva Tarea")
         }
       }
-    } else if (message.match(/eliminar\s+(?:la\s+)?tarea/i)) {
+    }
+    // Mejorar detección para eliminar tarea
+    else if (
+      message.match(/eliminar?\s+(?:la\s+)?tarea/i) ||
+      message.match(/borrar?\s+(?:la\s+)?tarea/i) ||
+      message.match(/quitar?\s+(?:la\s+)?tarea/i) ||
+      message.match(/elimina\s+tarea/i) ||
+      message.match(/borra\s+tarea/i) ||
+      message.match(/quita\s+tarea/i)
+    ) {
       facts.intent = "eliminar_tarea"
+      console.log("Intención detectada: eliminar_tarea")
       EntityExtractor.extractTareaEntities(facts)
-    } else if (
-      message.match(/cambiar\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea/i) ||
-      message.match(/renombrar\s+(?:la\s+)?tarea/i) ||
-      message.match(/modificar\s+(?:la\s+)?tarea/i) ||
-      message.match(/cambiar\s+(?:la\s+)?descripción\s+(?:de\s+la\s+)?tarea/i)
+    }
+    // Mejorar detección para modificar tarea
+    else if (
+      message.match(/cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea/i) ||
+      message.match(/renombrar?\s+(?:la\s+)?tarea/i) ||
+      message.match(/modificar?\s+(?:la\s+)?tarea/i) ||
+      message.match(/cambiar?\s+(?:la\s+)?descripción\s+(?:de\s+la\s+)?tarea/i) ||
+      message.match(/cambiar?\s+(?:la\s+)?tarea/i) ||
+      message.match(/renombra\s+tarea/i) ||
+      message.match(/cambia\s+(?:la\s+)?tarea/i) ||
+      message.match(/modifica\s+(?:la\s+)?tarea/i) ||
+      // Patrones específicos para "X por Y"
+      message.match(/tarea\s+\w+\s+por\s+\w+/i) ||
+      // Patrones específicos para "X a Y"
+      message.match(/tarea\s+\w+\s+a\s+\w+/i)
     ) {
       facts.intent = "modificar_tarea"
+      console.log("Intención detectada: modificar_tarea")
       EntityExtractor.extractTareaEntities(facts)
-    } else if (
-      message.match(/cambiar\s+(?:la\s+)?prioridad/i) ||
+    }
+    // Mejorar detección para cambiar prioridad
+    else if (
+      message.match(/cambiar?\s+(?:la\s+)?prioridad/i) ||
       message.match(/establecer\s+(?:la\s+)?prioridad/i) ||
-      message.match(/prioridad\s+(?:de\s+la\s+)?tarea/i)
+      message.match(/prioridad\s+(?:de\s+la\s+)?tarea/i) ||
+      message.match(/poner\s+(?:la\s+)?prioridad/i) ||
+      message.match(/asignar\s+(?:la\s+)?prioridad/i) ||
+      message.match(/modificar\s+(?:la\s+)?prioridad/i) ||
+      (message.includes("prioridad") &&
+        (message.includes("cambiar") ||
+          message.includes("cambia") ||
+          message.includes("establecer") ||
+          message.includes("establece") ||
+          message.includes("poner") ||
+          message.includes("pon") ||
+          message.includes("asignar") ||
+          message.includes("asigna") ||
+          message.includes("modificar") ||
+          message.includes("modifica")))
     ) {
       facts.intent = "cambiar_prioridad"
+      console.log("Intención detectada: cambiar_prioridad")
       EntityExtractor.extractTareaEntities(facts)
     }
     // Detección mejorada para cambiar fecha
@@ -205,7 +308,9 @@ export class IntentAnalyzer {
           }
         }
       }
-    } else if (
+    }
+    // Mejorar detección para gestionar miembros
+    else if (
       message.match(/asigna(?:r)?\s+miembros/i) ||
       message.match(/añad(?:ir|e)\s+miembros/i) ||
       message.match(/agrega(?:r)?\s+miembros/i) ||
@@ -229,14 +334,48 @@ export class IntentAnalyzer {
 
       console.log("Acción de miembros establecida:", facts.entities.accion_miembro)
       EntityExtractor.extractTareaEntities(facts)
-    } else if (message.match(/mover\s+(?:la\s+)?tarea/i)) {
+    }
+    // Mejorar detección para mover tarea
+    else if (
+      message.match(/mover\s+(?:la\s+)?tarea/i) ||
+      message.match(/mueve\s+(?:la\s+)?tarea/i) ||
+      message.match(/trasladar\s+(?:la\s+)?tarea/i) ||
+      message.match(/traslada\s+(?:la\s+)?tarea/i) ||
+      message.match(/cambiar\s+(?:la\s+)?tarea\s+de\s+columna/i) ||
+      message.match(/cambia\s+(?:la\s+)?tarea\s+de\s+columna/i) ||
+      (message.includes("tarea") &&
+        (message.includes("mover") ||
+          message.includes("mueve") ||
+          message.includes("trasladar") ||
+          message.includes("traslada") ||
+          (message.includes("cambiar") && message.includes("columna")) ||
+          (message.includes("cambia") && message.includes("columna"))))
+    ) {
       facts.intent = "mover_tarea"
+      console.log("Intención detectada: mover_tarea")
       EntityExtractor.extractTareaEntities(facts)
-    } else if (
+    }
+    // Mejorar detección para completar tarea
+    else if (
       message.match(/(?:completar|finalizar|terminar)\s+(?:la\s+)?tarea/i) ||
-      message.match(/marcar\s+(?:la\s+)?tarea\s+(?:como\s+)?(?:completada|finalizada|terminada)/i)
+      message.match(/marcar\s+(?:la\s+)?tarea\s+(?:como\s+)?(?:completada|finalizada|terminada)/i) ||
+      message.match(/completa\s+(?:la\s+)?tarea/i) ||
+      message.match(/finaliza\s+(?:la\s+)?tarea/i) ||
+      message.match(/termina\s+(?:la\s+)?tarea/i) ||
+      message.match(/marca\s+(?:la\s+)?tarea\s+(?:como\s+)?(?:completada|finalizada|terminada)/i) ||
+      (message.includes("tarea") &&
+        (message.includes("completar") ||
+          message.includes("completa") ||
+          message.includes("finalizar") ||
+          message.includes("finaliza") ||
+          message.includes("terminar") ||
+          message.includes("termina") ||
+          message.includes("completada") ||
+          message.includes("finalizada") ||
+          message.includes("terminada")))
     ) {
       facts.intent = "completar_tarea"
+      console.log("Intención detectada: completar_tarea")
       EntityExtractor.extractTareaEntities(facts)
     }
 
@@ -258,20 +397,22 @@ export class IntentAnalyzer {
       
 - Crear una columna: "Crea una columna llamada Pendientes"
 - Eliminar una columna: "Elimina la columna Pendientes"
-- Crear una tarea: "Crea una tarea llamada Estudiar Física"
+- Crear una tarea: "Crea una tarea llamada Estudiar Física en la columna Pendientes"
 - Modificar una tarea: "Cambia el título de la tarea Estudiar a Estudiar Matemáticas"
 - Cambiar prioridad: "Establece la prioridad de Estudiar Física a Alta"
 - Cambiar fecha: "Establece la fecha de la tarea Estudiar Física para mañana"
 - Asignar miembros: "Asigna miembros Juan, María a la tarea Estudiar Física"
 - Mover una tarea: "Mueve la tarea Estudiar Física a la columna En Progreso"
-- Completar una tarea: "Marca como completada la tarea Estudiar Física"`
+- Completar una tarea: "Marca como completada la tarea Estudiar Física"
+- Cambiar nombre del tablero: "Cambia el nombre del tablero a Nuevo Nombre" o "Cambia el tablero TP8 por TP3"
+- Eliminar tablero: "Elimina este tablero"`
     } else {
       // Si está en la página principal
       return `No entendí lo que quieres hacer. Aquí hay algunas cosas que puedes pedirme:
       
 - Crear un tablero: "Crea un tablero llamado Proyecto Escolar"
 - Eliminar un tablero: "Elimina el tablero Proyecto Escolar"
-- Modificar un tablero: "Cambia el nombre del tablero Proyecto a Proyecto Escolar"`
+- Modificar un tablero: "Cambia el nombre del tablero Proyecto a Proyecto Escolar" o "Cambia el tablero TP8 por TP3"`
     }
   }
 }
