@@ -140,26 +140,27 @@ export class EntityExtractor {
     const patronesNombre = [
       /columna\s+(?:llamada|que\s+se\s+llame|con\s+(?:el\s+)?nombre(?:\s+de)?)\s+"([^"]+)"/i,
       /columna\s+(?:llamada|que\s+se\s+llame|con\s+(?:el\s+)?nombre(?:\s+de)?)\s+([^\s"]+)/i,
-      /columna\s+llamada\s+([^\s",.]+)/i,
-      /crear\s+columna\s+([^\s",.]+)/i,
-      /crea\s+columna\s+([^\s",.]+)/i,
-      /nueva\s+columna\s+([^\s",.]+)/i,
+      /columna\s+llamada\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+con|\s+para|\s*$)/i,
+      /crear\s+columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+con|\s+para|\s*$)/i,
+      /crea\s+columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+con|\s+para|\s*$)/i,
+      /nueva\s+columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+con|\s+para|\s*$)/i,
     ]
 
     for (const patron of patronesNombre) {
       const match = message.match(patron)
       if (match && match[1]) {
         console.log(`Nombre de columna encontrado con patrón ${patron}: ${match[1]}`)
-        facts.entities.columna_nombre = match[1]
+        facts.entities.columna_nombre = match[1].trim()
         break
       }
     }
 
     // Si no se encontró con los patrones anteriores, buscar después de "llamada"
     if (!facts.entities.columna_nombre && message.toLowerCase().includes("llamada")) {
-      const partes = message.toLowerCase().split("llamada")
-      if (partes.length > 1 && partes[1].trim()) {
-        const nombrePosible = partes[1].trim().split(/\s+/)[0]
+      const partes = message.toLowerCase().split("llamada")[1].trim()
+      if (partes) {
+        // Extraer hasta alguna preposición o fin de frase
+        const nombrePosible = partes.split(/\s+(?:con|para|a|de|por)\s+/)[0].trim()
         if (nombrePosible) {
           console.log(`Nombre de columna extraído después de "llamada": ${nombrePosible}`)
           facts.entities.columna_nombre = nombrePosible
@@ -168,41 +169,38 @@ export class EntityExtractor {
     }
 
     // Para modificar columna - MEJORADO
-    const nombreActualPatrones = [
-      /columna\s+(?:llamada|que\s+se\s+llama|con\s+(?:el\s+)?nombre(?:\s+de)?)\s+"([^"]+)"\s+(?:a|por)/i,
-      /columna\s+(?:llamada|que\s+se\s+llama|con\s+(?:el\s+)?nombre(?:\s+de)?)\s+([^\s"]+)\s+(?:a|por)/i,
-      /columna\s+"([^"]+)"\s+(?:a|por)/i,
-      /columna\s+([^\s",.]+)\s+(?:a|por)/i,
-      /cambiar?\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna\s+"([^"]+)"\s+(?:a|por)/i,
-      /cambiar?\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna\s+([^\s",.]+)\s+(?:a|por)/i,
-      /renombrar?\s+(?:la\s+)?columna\s+"([^"]+)"\s+(?:a|por)/i,
-      /renombrar?\s+(?:la\s+)?columna\s+([^\s",.]+)\s+(?:a|por)/i,
-      /modifica\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna\s+"([^"]+)"\s+(?:a|por)/i,
-      /modifica\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna\s+([^\s",.]+)\s+(?:a|por)/i,
-      /cambia\s+(?:la\s+)?columna\s+"([^"]+)"\s+(?:a|por)/i,
-      /cambia\s+(?:la\s+)?columna\s+([^\s",.]+)\s+(?:a|por)/i,
+    // Primero intentamos con patrones específicos para "de X a Y"
+    const cambiarNombreColumnaPatrones = [
+      /cambiar\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna\s+"([^"]+)"\s+(?:a|por)\s+"([^"]+)"/i,
+      /cambiar\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna\s+"([^"]+)"\s+(?:a|por)\s+([^\s",.]+)/i,
+      /cambiar\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+"([^"]+)"/i,
+      /cambiar\s+(?:el\s+)?nombre\s+(?:de\s+la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /renombrar\s+(?:la\s+)?columna\s+"([^"]+)"\s+(?:a|por)\s+"([^"]+)"/i,
+      /renombrar\s+(?:la\s+)?columna\s+"([^"]+)"\s+(?:a|por)\s+([^\s",.]+)/i,
+      /renombrar\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+"([^"]+)"/i,
+      /renombrar\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /modifica\s+(?:la\s+)?columna\s+"([^"]+)"\s+(?:a|por)\s+"([^"]+)"/i,
+      /modifica\s+(?:la\s+)?columna\s+"([^"]+)"\s+(?:a|por)\s+([^\s",.]+)/i,
+      /modifica\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+"([^"]+)"/i,
+      /modifica\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /cambia\s+(?:la\s+)?columna\s+"([^"]+)"\s+(?:a|por)\s+"([^"]+)"/i,
+      /cambia\s+(?:la\s+)?columna\s+"([^"]+)"\s+(?:a|por)\s+([^\s",.]+)/i,
+      /cambia\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+"([^"]+)"/i,
+      /cambia\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
     ]
 
-    for (const patron of nombreActualPatrones) {
+    for (const patron of cambiarNombreColumnaPatrones) {
       const match = message.match(patron)
-      if (match && match[1]) {
+      if (match && match[1] && match[2]) {
         facts.entities.columna_nombre_actual = match[1].trim()
-        console.log("Nombre actual de columna encontrado:", facts.entities.columna_nombre_actual)
+        facts.entities.columna_nombre_nuevo = match[2].trim()
+        console.log(
+          "Nombre de columna actual y nuevo encontrados:",
+          facts.entities.columna_nombre_actual,
+          "->",
+          facts.entities.columna_nombre_nuevo,
+        )
         break
-      }
-    }
-
-    // Buscar el nuevo nombre después de "a" o "por"
-    if (facts.entities.columna_nombre_actual) {
-      const nombreNuevoPatrones = [/por\s+"([^"]+)"/i, /por\s+([^\s",.]+)/i, /a\s+"([^"]+)"/i, /a\s+([^\s",.]+)/i]
-
-      for (const patron of nombreNuevoPatrones) {
-        const match = message.match(patron)
-        if (match && match[1]) {
-          facts.entities.columna_nombre_nuevo = match[1].trim()
-          console.log("Nuevo nombre de columna encontrado:", facts.entities.columna_nombre_nuevo)
-          break
-        }
       }
     }
 
@@ -215,77 +213,296 @@ export class EntityExtractor {
     facts.entities = facts.entities || {}
     console.log("Extrayendo entidades de tarea del mensaje:", message)
 
-    // MEJORA: Extraer la columna donde crear/modificar/eliminar la tarea
+    // Detectar columna específica - NUEVO Y MEJORADO
     this.extractColumnForTask(facts, message)
 
-    // MEJORA: Extraer título de tarea con patrones más robustos
-    if (!facts.entities.tarea_titulo) {
-      this.extractTaskTitle(facts, message)
-    }
+    // Primero intentar extraer títulos con patrones específicos
+    this.extractTaskTitle(facts, message)
 
-    // MEJORA: Para modificar tarea - detectar título actual y nuevo título
-    this.extractTaskTitleChange(facts, message)
+    // Para modificar tarea - MEJORADO
+    this.extractTaskTitleUpdate(facts, message)
 
     // Extraer descripción si existe - MEJORADO
-    const descripcionPatrones = [
-      /descripción\s+"([^"]+)"/i,
-      /descripción\s+([^\s"]+)/i,
-      /con\s+descripción\s+"([^"]+)"/i,
-      /con\s+descripción\s+([^\s"]+)/i,
-      /con\s+la\s+descripción\s+"([^"]+)"/i,
-      /con\s+la\s+descripción\s+([^\s"]+)/i,
+    this.extractTaskDescription(facts, message)
+
+    // Extraer prioridad si existe - MEJORADO
+    this.extractTaskPriority(facts, message)
+
+    // Extraer fecha si existe - MANTENIDO
+    this.extractFechaEntities(facts, message)
+
+    // Extraer miembros si existen - MEJORADO
+    this.extractTaskMembers(facts, message)
+
+    // Extraer columna destino para mover tarea - MEJORADO
+    this.extractTaskColumnDestination(facts, message)
+
+    console.log("Entidades de tarea extraídas:", facts.entities)
+  }
+
+  // Métodos auxiliares para la extracción de entidades de tarea
+
+  // Extraer columna específica para la tarea - NUEVO
+  private static extractColumnForTask(facts: Facts, message: string): void {
+    console.log("Buscando columna específica para tarea")
+
+    // Patrones para detectar columna específica
+    const patronesColumna = [
+      /en\s+(?:la\s+)?columna\s+"([^"]+)"/i,
+      /en\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+con|\s+para|\s*$)/i,
+      /a\s+(?:la\s+)?columna\s+"([^"]+)"/i,
+      /a\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+con|\s+para|\s*$)/i,
+      /para\s+(?:la\s+)?columna\s+"([^"]+)"/i,
+      /para\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+con|\s+para|\s*$)/i,
+      /dentro\s+de\s+(?:la\s+)?columna\s+"([^"]+)"/i,
+      /dentro\s+de\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+con|\s+para|\s*$)/i,
     ]
 
-    for (const patron of descripcionPatrones) {
+    for (const patron of patronesColumna) {
+      const match = message.match(patron)
+      if (match && match[1]) {
+        facts.entities.columna_nombre = match[1].trim()
+        console.log(`Columna para tarea encontrada: "${facts.entities.columna_nombre}"`)
+        break
+      }
+    }
+  }
+
+  // Extraer título de la tarea - MEJORADO
+  private static extractTaskTitle(facts: Facts, message: string): void {
+    // Si ya tenemos un título (quizás de una detección anterior), no hacer nada
+    if (facts.entities.tarea_titulo) {
+      return
+    }
+
+    console.log("Extrayendo título de tarea")
+
+    // Patrones para títulos con comillas
+    const patronesConComillas = [
+      /tarea\s+(?:llamada|titulada|que\s+se\s+llame)\s+"([^"]+)"/i,
+      /tarea\s+"([^"]+)"/i,
+      /crear\s+tarea\s+"([^"]+)"/i,
+      /crea\s+tarea\s+"([^"]+)"/i,
+      /nueva\s+tarea\s+"([^"]+)"/i,
+    ]
+
+    // Primero buscar títulos con comillas
+    for (const patron of patronesConComillas) {
+      const match = message.match(patron)
+      if (match && match[1]) {
+        facts.entities.tarea_titulo = match[1].trim()
+        console.log(`Título de tarea con comillas encontrado: "${facts.entities.tarea_titulo}"`)
+        return
+      }
+    }
+
+    // Si no hay comillas, usar patrones más complejos
+    const patronesSinComillas = [
+      /tarea\s+(?:llamada|titulada)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+en\s+|\s+con\s+|\s+para\s+|\s*$)/i,
+      /crear\s+tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+en\s+|\s+con\s+|\s+para\s+|\s*$)/i,
+      /crea\s+tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+en\s+|\s+con\s+|\s+para\s+|\s*$)/i,
+      /nueva\s+tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+en\s+|\s+con\s+|\s+para\s+|\s*$)/i,
+    ]
+
+    for (const patron of patronesSinComillas) {
+      const match = message.match(patron)
+      if (match && match[1] && !["nueva", "llamada", "que", "con", "en"].includes(match[1].toLowerCase())) {
+        facts.entities.tarea_titulo = match[1].trim()
+        console.log(`Título de tarea sin comillas encontrado: "${facts.entities.tarea_titulo}"`)
+        return
+      }
+    }
+
+    // Si aún no hay título y el mensaje contiene "llamada" o "titulada", intentar extraer el título
+    if (message.toLowerCase().includes("llamada") || message.toLowerCase().includes("titulada")) {
+      const parte = message
+        .toLowerCase()
+        .split(/llamada|titulada/)[1]
+        .trim()
+      if (parte) {
+        // Extraer hasta la siguiente preposición o fin de mensaje
+        const titulo = parte.split(/\s+(?:en|con|para|a|de|por)\s+/)[0].trim()
+        if (titulo) {
+          facts.entities.tarea_titulo = titulo
+          console.log(`Título de tarea extraído después de "llamada/titulada": "${facts.entities.tarea_titulo}"`)
+          return
+        }
+      }
+    }
+
+    // Casos específicos según la intención
+    if (
+      facts.intent === "eliminar_tarea" ||
+      facts.intent === "cambiar_prioridad" ||
+      facts.intent === "cambiar_fecha" ||
+      facts.intent === "gestionar_miembros"
+    ) {
+      const patronesEspecificos = [
+        /tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+a|\s+de|\s+en|\s+con|\s+para|\s*$)/i,
+        /de\s+(?:la\s+)?tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+a|\s+de|\s+en|\s+con|\s+para|\s*$)/i,
+        /para\s+(?:la\s+)?tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+a|\s+de|\s+en|\s+con|\s+para|\s*$)/i,
+      ]
+
+      for (const patron of patronesEspecificos) {
+        const match = message.match(patron)
+        if (match && match[1]) {
+          facts.entities.tarea_titulo = match[1].trim()
+          console.log(`Título de tarea para acción específica encontrado: "${facts.entities.tarea_titulo}"`)
+          return
+        }
+      }
+    }
+  }
+
+  // Extraer título actual y nuevo para actualización de tarea - MEJORADO
+  private static extractTaskTitleUpdate(facts: Facts, message: string): void {
+    if (facts.intent !== "modificar_tarea") {
+      return
+    }
+
+    console.log("Extrayendo títulos para actualización de tarea")
+
+    // Patrones para cambio de título con "a" o "por"
+    const patronesCambioTitulo = [
+      /cambiar\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+"([^"]+)"\s+(?:a|por)\s+"([^"]+)"/i,
+      /cambiar\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+"([^"]+)"\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /cambiar\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+"([^"]+)"/i,
+      /cambiar\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /renombrar\s+(?:la\s+)?tarea\s+"([^"]+)"\s+(?:a|por)\s+"([^"]+)"/i,
+      /renombrar\s+(?:la\s+)?tarea\s+"([^"]+)"\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /renombrar\s+(?:la\s+)?tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+"([^"]+)"/i,
+      /renombrar\s+(?:la\s+)?tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /modificar\s+(?:la\s+)?tarea\s+"([^"]+)"\s+(?:a|por)\s+"([^"]+)"/i,
+      /modificar\s+(?:la\s+)?tarea\s+"([^"]+)"\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /modificar\s+(?:la\s+)?tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+"([^"]+)"/i,
+      /modificar\s+(?:la\s+)?tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /tarea\s+"([^"]+)"\s+(?:a|por)\s+"([^"]+)"/i,
+      /tarea\s+"([^"]+)"\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+"([^"]+)"/i,
+      /tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)\s+(?:a|por)\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+    ]
+
+    for (const patron of patronesCambioTitulo) {
+      const match = message.match(patron)
+      if (match && match[1] && match[2]) {
+        facts.entities.tarea_titulo_actual = match[1].trim()
+        facts.entities.tarea_titulo_nuevo = match[2].trim()
+        console.log(
+          "Títulos para actualización encontrados:",
+          facts.entities.tarea_titulo_actual,
+          "->",
+          facts.entities.tarea_titulo_nuevo,
+        )
+        return
+      }
+    }
+
+    // Si no encontramos un patrón claro, pero hay un único "tarea X", asumimos que es el título actual
+    if (!facts.entities.tarea_titulo_actual) {
+      // Si ya se extrajo un título normal, usarlo como título actual
+      if (facts.entities.tarea_titulo) {
+        facts.entities.tarea_titulo_actual = facts.entities.tarea_titulo
+        delete facts.entities.tarea_titulo
+        console.log("Usando título extraído como título actual:", facts.entities.tarea_titulo_actual)
+      }
+    }
+  }
+
+  // Extraer descripción de tarea - MEJORADO
+  private static extractTaskDescription(facts: Facts, message: string): void {
+    console.log("Buscando descripción de tarea")
+
+    // Patrones para descripción con comillas
+    const patronesDescripcion = [
+      /descripción\s+"([^"]+)"/i,
+      /descripcion\s+"([^"]+)"/i,
+      /con\s+(?:la\s+)?descripción\s+"([^"]+)"/i,
+      /con\s+(?:la\s+)?descripcion\s+"([^"]+)"/i,
+      /con\s+descripción\s+"([^"]+)"/i,
+      /con\s+descripcion\s+"([^"]+)"/i,
+      /descripción\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+en|\s+con|\s+para|\s*$)/i,
+      /descripcion\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+en|\s+con|\s+para|\s*$)/i,
+    ]
+
+    for (const patron of patronesDescripcion) {
       const match = message.match(patron)
       if (match && match[1]) {
         facts.entities.tarea_descripcion = match[1].trim()
-        console.log("Descripción de tarea encontrada:", facts.entities.tarea_descripcion)
+        console.log(`Descripción de tarea encontrada: "${facts.entities.tarea_descripcion}"`)
         break
       }
     }
 
-    // Extraer prioridad si existe - MEJORADO
-    const prioridadPatrones = [
+    // Si no encontramos con patrones específicos pero hay "con" después del título
+    if (!facts.entities.tarea_descripcion && message.toLowerCase().includes(" con ")) {
+      const partes = message.toLowerCase().split(" con ")
+      if (partes.length > 1) {
+        // Excluir patrones que no son descripción
+        if (
+          !partes[1].includes("prioridad") &&
+          !partes[1].includes("fecha") &&
+          !partes[1].includes("miembro") &&
+          !partes[1].includes("para") &&
+          !partes[1].includes("columna")
+        ) {
+          // Extraer hasta la siguiente preposición o fin de mensaje
+          const descripcion = partes[1].split(/\s+(?:en|para|a|de)\s+/)[0].trim()
+          if (descripcion) {
+            facts.entities.tarea_descripcion = descripcion
+            console.log(`Descripción de tarea extraída después de "con": "${facts.entities.tarea_descripcion}"`)
+          }
+        }
+      }
+    }
+  }
+
+  // Extraer prioridad de tarea - MEJORADO
+  private static extractTaskPriority(facts: Facts, message: string): void {
+    console.log("Buscando prioridad de tarea")
+
+    // Patrones para detección de prioridad
+    const patronesPrioridad = [
       /prioridad\s+(alta|media|baja)/i,
-      /con\s+prioridad\s+(alta|media|baja)/i,
-      /con\s+la\s+prioridad\s+(alta|media|baja)/i,
       /prioridad\s+(high|medium|low)/i,
+      /con\s+prioridad\s+(alta|media|baja)/i,
       /con\s+prioridad\s+(high|medium|low)/i,
-      /con\s+la\s+prioridad\s+(high|medium|low)/i,
+      /(?:en|como|de)\s+prioridad\s+(alta|media|baja)/i,
+      /(?:en|como|de)\s+prioridad\s+(high|medium|low)/i,
     ]
 
-    for (const patron of prioridadPatrones) {
+    for (const patron of patronesPrioridad) {
       const match = message.match(patron)
       if (match && match[1]) {
+        // Normalizar valor de prioridad
         let prioridad = match[1].toLowerCase()
-        // Normalizar prioridades en inglés
         if (prioridad === "high") prioridad = "alta"
         if (prioridad === "medium") prioridad = "media"
         if (prioridad === "low") prioridad = "baja"
 
-        facts.entities.tarea_prioridad = prioridad
-        console.log("Prioridad de tarea encontrada:", facts.entities.tarea_prioridad)
+        facts.entities.tarea_prioridad = prioridad.charAt(0).toUpperCase() + prioridad.slice(1) // Capitalizar
+        console.log(`Prioridad de tarea encontrada: ${facts.entities.tarea_prioridad}`)
         break
       }
     }
+  }
 
-    // Extraer fecha si existe - MEJORADO para expresiones de fecha
-    this.extractFechaEntities(facts, message)
+  // Extraer miembros de tarea - MEJORADO
+  private static extractTaskMembers(facts: Facts, message: string): void {
+    console.log("Buscando miembros de tarea")
 
-    // Extraer miembros si existen - mejorado para capturar múltiples miembros
-    const miembrosPatrones = [
+    // Patrones para detección de miembros
+    const patronesMiembros = [
       /miembros?\s+"([^"]+)"/i,
       /miembros?\s+([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
-      /con\s+miembros?\s+"([^"]+)"/i,
-      /con\s+miembros?\s+([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
-      /con\s+los\s+miembros?\s+"([^"]+)"/i,
-      /con\s+los\s+miembros?\s+([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
-      /asigna(?:r)?\s+miembros?\s+"([^"]+)"/i,
-      /asigna(?:r)?\s+miembros?\s+([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
+      /asigna(?:r)?\s+(?:a\s+)?([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
+      /añad(?:ir|e)\s+(?:a\s+)?([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
+      /agrega(?:r)?\s+(?:a\s+)?([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
+      /quita(?:r)?\s+(?:a\s+)?([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
+      /elimina(?:r)?\s+(?:a\s+)?([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
+      /remueve\s+(?:a\s+)?([^"]+?)(?:\s+a\s+la|\s+de\s+la|\s+en|\s+para|\s*$)/i,
     ]
 
-    for (const patron of miembrosPatrones) {
+    for (const patron of patronesMiembros) {
       const match = message.match(patron)
       if (match && match[1]) {
         console.log("Miembros encontrados:", match[1])
@@ -297,234 +514,48 @@ export class EntityExtractor {
     }
 
     // Extraer acción para miembros (agregar/quitar) si no se estableció antes
-    if (!facts.entities.accion_miembro) {
-      const accionMiembroMatch = message.match(/(agregar|añadir|asignar|quitar|eliminar|remover)\s+miembros?/i)
+    if (!facts.entities.accion_miembro && facts.entities.tarea_miembros) {
+      const accionMiembroMatch = message.match(
+        /(agregar|añadir|asignar|quitar|eliminar|remover)\s+(?:a\s+)?(?:los\s+)?miembros?/i,
+      )
 
       if (accionMiembroMatch) {
-        facts.entities.accion_miembro = accionMiembroMatch[1]
+        facts.entities.accion_miembro = accionMiembroMatch[1].toLowerCase()
         console.log("Acción de miembro detectada:", facts.entities.accion_miembro)
       }
 
       // Si no se detectó una acción específica pero hay miembros, asumir "asignar" por defecto
-      if (facts.entities.tarea_miembros && !facts.entities.accion_miembro) {
+      if (!facts.entities.accion_miembro) {
         facts.entities.accion_miembro = "asignar"
         console.log("Usando acción de miembro por defecto: asignar")
       }
     }
+  }
 
-    // Extraer columna destino para mover tarea - MEJORADO
-    const columnaDestinoPatrones = [
+  // Extraer columna destino para mover tarea - MEJORADO
+  private static extractTaskColumnDestination(facts: Facts, message: string): void {
+    if (facts.intent !== "mover_tarea") {
+      return
+    }
+
+    console.log("Buscando columna destino para mover tarea")
+
+    // Patrones para columna destino
+    const patronesColumnaDestino = [
       /a\s+(?:la\s+)?columna\s+"([^"]+)"/i,
-      /a\s+(?:la\s+)?columna\s+([^\s",.]+)/i,
+      /a\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
       /hacia\s+(?:la\s+)?columna\s+"([^"]+)"/i,
-      /hacia\s+(?:la\s+)?columna\s+([^\s",.]+)/i,
-      /en\s+(?:la\s+)?columna\s+"([^"]+)"/i,
-      /en\s+(?:la\s+)?columna\s+([^\s",.]+)/i,
+      /hacia\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
+      /para\s+(?:la\s+)?columna\s+"([^"]+)"/i,
+      /para\s+(?:la\s+)?columna\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s|$)/i,
     ]
 
-    for (const patron of columnaDestinoPatrones) {
+    for (const patron of patronesColumnaDestino) {
       const match = message.match(patron)
       if (match && match[1]) {
         facts.entities.columna_destino = match[1].trim()
-        console.log("Columna destino encontrada:", facts.entities.columna_destino)
+        console.log(`Columna destino encontrada: "${facts.entities.columna_destino}"`)
         break
-      }
-    }
-
-    console.log("Entidades de tarea extraídas:", facts.entities)
-  }
-
-  // NUEVO: Método para extraer la columna donde crear/modificar/eliminar la tarea
-  private static extractColumnForTask(facts: Facts, message: string): void {
-    const columnaPatrones = [
-      /en\s+(?:la\s+)?columna\s+"([^"]+)"/i,
-      /en\s+(?:la\s+)?columna\s+([^\s",.]+)/i,
-      /dentro\s+de\s+(?:la\s+)?columna\s+"([^"]+)"/i,
-      /dentro\s+de\s+(?:la\s+)?columna\s+([^\s",.]+)/i,
-      /para\s+(?:la\s+)?columna\s+"([^"]+)"/i,
-      /para\s+(?:la\s+)?columna\s+([^\s",.]+)/i,
-      /de\s+(?:la\s+)?columna\s+"([^"]+)"/i,
-      /de\s+(?:la\s+)?columna\s+([^\s",.]+)/i,
-    ]
-
-    for (const patron of columnaPatrones) {
-      const match = message.match(patron)
-      if (match && match[1]) {
-        facts.entities.columna_nombre = match[1].trim()
-        console.log("Columna para tarea encontrada:", facts.entities.columna_nombre)
-        break
-      }
-    }
-  }
-
-  // NUEVO: Método para extraer el título de la tarea
-  private static extractTaskTitle(facts: Facts, message: string): void {
-    // Patrones para títulos con comillas
-    const tituloComillasPatrones = [
-      /tarea\s+(?:llamada|que\s+se\s+llame|con\s+(?:el\s+)?(?:nombre|título)(?:\s+de)?)\s+"([^"]+)"/i,
-      /tarea\s+"([^"]+)"/i,
-      /crear\s+tarea\s+"([^"]+)"/i,
-      /crea\s+tarea\s+"([^"]+)"/i,
-      /nueva\s+tarea\s+"([^"]+)"/i,
-    ]
-
-    for (const patron of tituloComillasPatrones) {
-      const match = message.match(patron)
-      if (match && match[1]) {
-        facts.entities.tarea_titulo = match[1].trim()
-        console.log(`Título de tarea encontrado con comillas: "${facts.entities.tarea_titulo}"`)
-        return
-      }
-    }
-
-    // Si no hay comillas, extraer el título entre "llamada" y "en" (para tareas en columnas específicas)
-    if (message.toLowerCase().includes("llamada") && message.toLowerCase().includes(" en ")) {
-      const parteInicial = message.toLowerCase().split("llamada")[1].trim()
-      const partes = parteInicial.split(" en ")
-      if (partes.length > 0 && partes[0].trim()) {
-        facts.entities.tarea_titulo = partes[0].trim()
-        console.log(`Título de tarea extraído entre "llamada" y "en": "${facts.entities.tarea_titulo}"`)
-        return
-      }
-    }
-
-    // Si no hay "en", intentar extraer todo después de "llamada" hasta alguna preposición
-    if (message.toLowerCase().includes("llamada")) {
-      const parteInicial = message.toLowerCase().split("llamada")[1].trim()
-      // Extraer hasta alguna preposición o fin de la frase
-      const titulo = parteInicial.split(/\s+(?:con|para|a|de|por|en)\s+/)[0].trim()
-      if (titulo) {
-        facts.entities.tarea_titulo = titulo
-        console.log(`Título de tarea extraído después de "llamada": "${facts.entities.tarea_titulo}"`)
-        return
-      }
-    }
-
-    // Patrones para títulos sin comillas
-    const tituloSinComillasPatrones = [
-      /tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+(?:con|para|a|de|por|en)|\s*$)/i,
-      /crear\s+tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+(?:con|para|a|de|por|en)|\s*$)/i,
-      /crea\s+tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+(?:con|para|a|de|por|en)|\s*$)/i,
-      /nueva\s+tarea\s+([^\s",.]+(?:\s+[^\s",.]+)*?)(?:\s+(?:con|para|a|de|por|en)|\s*$)/i,
-    ]
-
-    for (const patron of tituloSinComillasPatrones) {
-      const match = message.match(patron)
-      if (match && match[1] && !["nueva", "llamada", "que", "con"].includes(match[1].toLowerCase())) {
-        facts.entities.tarea_titulo = match[1].trim()
-        console.log(`Título de tarea encontrado sin comillas: "${facts.entities.tarea_titulo}"`)
-        return
-      }
-    }
-
-    // Patrones específicos para el caso de cambiar fecha
-    if (facts.intent === "cambiar_fecha") {
-      const patronesTituloTarea = [
-        /fecha\s+de\s+(?:la\s+)?tarea\s+"([^"]+)"/i,
-        /fecha\s+de\s+(?:la\s+)?tarea\s+([^"]+?)(?:\s+a|\s+para|\s*$)/i,
-        /tarea\s+"([^"]+)"\s+(?:a|para)/i,
-        /tarea\s+([^"]+?)(?:\s+a|\s+para|\s*$)/i,
-      ]
-
-      for (const patron of patronesTituloTarea) {
-        const match = message.match(patron)
-        if (match && match[1]) {
-          facts.entities.tarea_titulo = match[1].trim()
-          console.log(`Título de tarea para cambio de fecha encontrado: "${facts.entities.tarea_titulo}"`)
-          return
-        }
-      }
-    }
-
-    // Patrones específicos para el caso de gestionar miembros
-    if (facts.intent === "gestionar_miembros") {
-      const patronesTituloTarea = [
-        /a\s+la\s+tarea\s+"([^"]+)"/i,
-        /a\s+la\s+tarea\s+([^"]+?)(?:\s*$|\s+con)/i,
-        /de\s+la\s+tarea\s+"([^"]+)"/i,
-        /de\s+la\s+tarea\s+([^"]+?)(?:\s*$|\s+con)/i,
-        /tarea\s+"([^"]+)"/i,
-        /tarea\s+([^"]+?)(?:\s*$|\s+con)/i,
-      ]
-
-      for (const patron of patronesTituloTarea) {
-        const match = message.match(patron)
-        if (match && match[1]) {
-          facts.entities.tarea_titulo = match[1].trim()
-          console.log(`Título de tarea para gestión de miembros encontrado: "${facts.entities.tarea_titulo}"`)
-          return
-        }
-      }
-    }
-  }
-
-  // NUEVO: Método para extraer cambios de título de tarea
-  private static extractTaskTitleChange(facts: Facts, message: string): void {
-    // Patrones para detectar título actual y nuevo título con "por"
-    const cambiarTituloPorPatrones = [
-      /cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+"([^"]+)"\s+por\s+"([^"]+)"/i,
-      /cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+"([^"]+)"\s+por\s+([^\s",.]+)/i,
-      /cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+([^\s",.]+)\s+por\s+"([^"]+)"/i,
-      /cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+([^\s",.]+)\s+por\s+([^\s",.]+)/i,
-      /renombrar?\s+(?:la\s+)?tarea\s+"([^"]+)"\s+por\s+"([^"]+)"/i,
-      /renombrar?\s+(?:la\s+)?tarea\s+"([^"]+)"\s+por\s+([^\s",.]+)/i,
-      /renombrar?\s+(?:la\s+)?tarea\s+([^\s",.]+)\s+por\s+"([^"]+)"/i,
-      /renombrar?\s+(?:la\s+)?tarea\s+([^\s",.]+)\s+por\s+([^\s",.]+)/i,
-      /modifica\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+"([^"]+)"\s+por\s+"([^"]+)"/i,
-      /modifica\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+"([^"]+)"\s+por\s+([^\s",.]+)/i,
-      /modifica\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+([^\s",.]+)\s+por\s+"([^"]+)"/i,
-      /modifica\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+([^\s",.]+)\s+por\s+([^\s",.]+)/i,
-      // Patrones más directos
-      /cambia\s+(?:la\s+)?tarea\s+"([^"]+)"\s+por\s+"([^"]+)"/i,
-      /cambia\s+(?:la\s+)?tarea\s+"([^"]+)"\s+por\s+([^\s",.]+)/i,
-      /cambia\s+(?:la\s+)?tarea\s+([^\s",.]+)\s+por\s+"([^"]+)"/i,
-      /cambia\s+(?:la\s+)?tarea\s+([^\s",.]+)\s+por\s+([^\s",.]+)/i,
-    ]
-
-    for (const patron of cambiarTituloPorPatrones) {
-      const match = message.match(patron)
-      if (match && match[1] && match[2]) {
-        facts.entities.tarea_titulo_actual = match[1].trim()
-        facts.entities.tarea_titulo_nuevo = match[2].trim()
-        console.log(
-          "Título actual y nuevo encontrados con 'por':",
-          facts.entities.tarea_titulo_actual,
-          "->",
-          facts.entities.tarea_titulo_nuevo,
-        )
-        return
-      }
-    }
-
-    // Patrones para detectar título actual y nuevo título con "a"
-    const cambiarTituloAPatrones = [
-      /cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+"([^"]+)"\s+a\s+"([^"]+)"/i,
-      /cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+"([^"]+)"\s+a\s+([^\s",.]+)/i,
-      /cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+([^\s",.]+)\s+a\s+"([^"]+)"/i,
-      /cambiar?\s+(?:el\s+)?(?:nombre|título)\s+(?:de\s+la\s+)?tarea\s+([^\s",.]+)\s+a\s+([^\s",.]+)/i,
-      /renombrar?\s+(?:la\s+)?tarea\s+"([^"]+)"\s+a\s+"([^"]+)"/i,
-      /renombrar?\s+(?:la\s+)?tarea\s+"([^"]+)"\s+a\s+([^\s",.]+)/i,
-      /renombrar?\s+(?:la\s+)?tarea\s+([^\s",.]+)\s+a\s+"([^"]+)"/i,
-      /renombrar?\s+(?:la\s+)?tarea\s+([^\s",.]+)\s+a\s+([^\s",.]+)/i,
-      // Patrones más directos
-      /cambia\s+(?:la\s+)?tarea\s+"([^"]+)"\s+a\s+"([^"]+)"/i,
-      /cambia\s+(?:la\s+)?tarea\s+"([^"]+)"\s+a\s+([^\s",.]+)/i,
-      /cambia\s+(?:la\s+)?tarea\s+([^\s",.]+)\s+a\s+"([^"]+)"/i,
-      /cambia\s+(?:la\s+)?tarea\s+([^\s",.]+)\s+a\s+([^\s",.]+)/i,
-    ]
-
-    for (const patron of cambiarTituloAPatrones) {
-      const match = message.match(patron)
-      if (match && match[1] && match[2]) {
-        facts.entities.tarea_titulo_actual = match[1].trim()
-        facts.entities.tarea_titulo_nuevo = match[2].trim()
-        console.log(
-          "Título actual y nuevo encontrados con 'a':",
-          facts.entities.tarea_titulo_actual,
-          "->",
-          facts.entities.tarea_titulo_nuevo,
-        )
-        return
       }
     }
   }
@@ -590,7 +621,7 @@ export class EntityExtractor {
       }
     }
 
-    // Si aún no hay fecha, buscar patrones de "próximo día de la semana"
+    // Si aún no hay fecha, buscar patrones de "próximo lunes/martes/etc."
     if (!fechaExpresion) {
       const proximoDiaMatch = message.match(/pr[óo]ximo\s+([a-zé]+)/i)
       if (proximoDiaMatch) {
